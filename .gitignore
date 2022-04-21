@@ -1,0 +1,3 @@
+.*
+*.py[cdwio]
+__pycache__
