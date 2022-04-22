@@ -1,3 +1,6 @@
 .*
 *.py[cdwio]
 __pycache__
+Attic
+dist
+htmlcov
