@@ -8,14 +8,13 @@ import pymsteams
 
 from django.conf import settings
 from django import forms
-# from django.template.loader import render_to_string
 
 from argus.notificationprofile.media.base import NotificationMedium
 
 
 LOG = logging.getLogger(__name__)
 
-__version__ = "0.1"
+__version__ = "0.2"
 __all__ = [
     "MSTeamsNotification",
 ]
@@ -37,26 +36,43 @@ def modelinstance_to_dict(obj):
 
 def _build_context(event):
     title = f"{event}"
-    incident_dict = modelinstance_to_dict(event.incident)
-    for field in ("id", "source_id"):
+    incident = event.incident
+    start_time = incident.start_time.isoformat()
+    source = str(incident.source)
+    subject = f"{settings.NOTIFICATION_SUBJECT_PREFIX}{title}"
+    expiration = None
+    if event.type == "ACK":
+        expiration = event.acknowledgment.expiration.isoformat()
+
+    incident_dict = modelinstance_to_dict(incident)
+    for field in ("id", "source_id", "start_time", "end_time"):
         incident_dict.pop(field)
+    incident_dict["start_time"] = start_time
+    incident_dict["source"] = source
 
     context = {
+        "subject": subject,
         "title": title,
-        "event": event,
+        "status": event.type,
+        "expiration": expiration,
+        "level": incident.level,
+        "actor": event.actor.username,
+        'message': incident.description,
         "incident_dict": incident_dict,
     }
-    subject = f"{settings.NOTIFICATION_SUBJECT_PREFIX}{title}"
-    return subject, context, event.incident.level
+    return context
 
 
-def _build_card(teams_webhook, subject, context, level):
+def _build_card(teams_webhook, context):
     card = pymsteams.connectorcard(teams_webhook)
-    card.title(subject)
-    card.color(SEVERITY_COLOR_MAPPING[level])
+    card.title(context["subject"])
+    card.color(SEVERITY_COLOR_MAPPING[context["level"]])
+    card.text(context['message'])
     fact_section = pymsteams.cardsection()
-    fact_section.addFact("Status", context['event'].type)
-    fact_section.addFact("Actor", context['event'].actor.username)
+    fact_section.addFact("Status", context['status'])
+    fact_section.addFact("Actor", context['actor'])
+    if context["expiration"]:
+        fact_section.addFact("Expires", context['expiration'])
     for field, value in context["incident_dict"].items():
         fact_section.addFact(field, value)
     card.addSection(fact_section)
@@ -99,14 +115,17 @@ class MSTeamsNotification(NotificationMedium):
         if not teams_destinations:
             return False
 
-        subject, message, level = _build_context(event)
+        subject, context = _build_context(event)
 
         for destination in teams_destinations:
+            label = destination.label or MSTeamsNotification.get_label(destination)
             webhook = destination.settings["webhook"]
-            card = _build_card(teams_webhook, subject, message, event.level)
+            card = _build_card(teams_webhook, subject, context)
 
             try:
-                card.send()
+                result = card.send()
             except pymsteams.TeamsWebhookException as e:
-                label = destination.label or MSTeamsNotification.get_label(destination)
                 LOG.exception("Could not send to MS Teams {label}: {e}")
+            else:
+                if result is not True:
+                    LOG.exception("Could not send to MS Teams {label}: Unknown reason")

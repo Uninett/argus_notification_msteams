@@ -13,28 +13,38 @@ class TestHelperFunctions(TestCase):
         cls.event = incident.events.first()
 
     def test__build_context_subject_starts_with_fixed_prefix(self):
-        subject, _, _ = _build_context(self.event)
+        context = _build_context(self.event)
         prefix = settings.NOTIFICATION_SUBJECT_PREFIX
         self.assertTrue(
-            subject.startswith(prefix),
+            context['subject'].startswith(prefix),
             f"Subject is not prefixed with {prefix}",
         )
 
     def test__build_context_context_has_correct_contents(self):
-        _, context, _ = _build_context(self.event)
-        self.assertEqual(context["title"], str(self.event))
-        self.assertEqual(context["event"], self.event)
+        context = _build_context(self.event)
+        incident = self.event.incident
+        expected_context_keys = set((
+            "subject",
+            "title",
+            "status",
+            "expiration",
+            "level",
+            "actor",
+            "message",
+            "incident_dict",
+        ))
+        self.assertEqual(set(context.keys()), expected_context_keys)
 
     def test__build_context_level_is_incident_level(self):
-        _, _, level = _build_context(self.event)
-        self.assertEqual(level, self.event.incident.level)
+        context = _build_context(self.event)
+        self.assertEqual(context['level'], self.event.incident.level)
 
     def test___build_card(self):
-        subject, context, level = _build_context(self.event)
+        context = _build_context(self.event)
         webhook = "https://example.org/"
-        card = _build_card(webhook, subject, context, level)
+        card = _build_card(webhook, context)
         self.assertEqual(card.hookurl, webhook)
-        self.assertEqual(card.payload["title"], subject)
+        self.assertEqual(card.payload["title"], context['subject'])
         # One section
         self.assertEqual(len(card.payload["sections"]), 1)
         # Only containing facts
