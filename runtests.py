@@ -12,6 +12,6 @@ if __name__ == "__main__":
     from django import setup
     setup()
     TestRunner = get_runner(settings)
-    test_runner = TestRunner()
+    test_runner = TestRunner(verbosity=2)
     failures = test_runner.run_tests(["tests"])
     sys.exit(bool(failures))
