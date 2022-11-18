@@ -11,6 +11,7 @@ INSTALLED_APPS = [
     'django.contrib.auth',
 
     # Must make tables
+    'rest_framework.authtoken',
     'argus.auth',
     'argus.incident',
     'argus.notificationprofile',
@@ -28,5 +29,6 @@ MIDDLEWARE_CLASSES = ()
 # Argus specific settings
 NOTIFICATION_SUBJECT_PREFIX = "[Argus] "
 MEDIA_PLUGINS = [
-    "argusnotification.msteams.MSTeamsNotification",
+    "argus.notificationprofile.media.email.EmailNotification",
+    "argus_notification_msteams.MSTeamsNotification",
 ]
