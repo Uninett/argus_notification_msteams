@@ -25,6 +25,7 @@ classifiers = [
     "Topic :: System :: Monitoring",
 ]
 dynamic = ["version", "description"]
+readme = "README.rst"
 
 [project.optional-dependencies]
 test = [
