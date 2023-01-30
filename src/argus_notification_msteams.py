@@ -14,7 +14,7 @@ from argus.notificationprofile.media.base import NotificationMedium
 
 LOG = logging.getLogger(__name__)
 
-__version__ = "0.2"
+__version__ = "0.3"
 __all__ = [
     "MSTeamsNotification",
 ]
@@ -99,7 +99,7 @@ class MSTeamsNotification(NotificationMedium):
         webhook = forms.URLField(required=True)
 
     @classmethod
-    def validate(cls, instance, dict_):
+    def validate(cls, instance, dict_, _):
         form = cls.Form(dict_["settings"])
         if not form.is_valid():
             raise ValidationError(form.errors)
