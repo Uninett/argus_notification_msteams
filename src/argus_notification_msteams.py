@@ -14,7 +14,7 @@ from argus.notificationprofile.media.base import NotificationMedium
 
 LOG = logging.getLogger(__name__)
 
-__version__ = "0.3"
+__version__ = "0.4"
 __all__ = [
     "MSTeamsNotification",
 ]
@@ -104,6 +104,10 @@ class MSTeamsNotification(NotificationMedium):
         if not form.is_valid():
             raise ValidationError(form.errors)
         return form.cleaned_data
+
+    @classmethod
+    def has_duplicate(self, queryset, settings: dict) -> bool:
+        return queryset.filter(settings__webhook=settings["webhook"]).exists()
 
     @classmethod
     def get_label(self, destination):
