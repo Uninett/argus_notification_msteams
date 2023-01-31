@@ -11,10 +11,11 @@ Different levels of incidents have hard-coded colors.
 Django settings
 ---------------
 
-Add ``argus_notification_msteams`` to ``MEDIA_PLUGINS``::
+Add ``argus_notification_msteams.MSTeamsNotification`` to ``MEDIA_PLUGINS``::
 
     MEDIA_PLUGINS = [
-        "argus_notification_msteams",
+        ..
+        "argus_notification_msteams.MSTeamsNotification",
     ]
 
 The plugin uses the setting ``NOTIFICATION_SUBJECT_PREFIX``.
@@ -22,15 +23,15 @@ The plugin uses the setting ``NOTIFICATION_SUBJECT_PREFIX``.
 Configuration
 -------------
 
-Create a webhook inside MS Teams, which results in an url that is stored in the
-``settings``-field.
+Create a webhook inside MS Teams, which results in a long url that needs to be
+stored in the ``settings``-field.
 
 You can test without invoking the frontend by adding the webhook manually in
 Django admin.
 
 POST-ing to the API:
 
-/api/v2/notificationprofiles/destinations/::
+/api/v2/notificationprofiles/destinations/, POSTed body::
 
     {
       "media": "msteams",
@@ -42,7 +43,7 @@ POST-ing to the API:
 
 GET-ing from the API:
 
-/api/v2/notificationprofiles/destinations/{id}/::
+/api/v2/notificationprofiles/destinations/{id}/, received result::
 
   {
     "pk": 0,
