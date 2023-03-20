@@ -14,7 +14,7 @@ from argus.notificationprofile.media.base import NotificationMedium
 
 LOG = logging.getLogger(__name__)
 
-__version__ = "0.4"
+__version__ = "0.5"
 __all__ = [
     "MSTeamsNotification",
 ]
