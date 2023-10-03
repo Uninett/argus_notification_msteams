@@ -7,7 +7,7 @@ name = "argus_notification_msteams"
 authors = [{name = "Hanne Moa", email = "hanne.moa@sikt.no"}]
 maintainers = [{name = "Hanne Moa", email = "hanne.moa@sikt.no"}]
 dependencies = [
-    "argus-server>=1.9",
+    "argus-server>=1.9,<1.14.0",
     "pymsteams>=0.2",
 ]
 requires-python = ">=3.7"

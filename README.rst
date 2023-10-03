@@ -8,6 +8,8 @@ This is a plugin to send notifications to MSTeams from
 
 Different levels of incidents have hard-coded colors.
 
+Version 0.5.1 and older can be used by argus-server version 1.9.x to 1.13.x.
+
 Django settings
 ---------------
 
