@@ -1,20 +1,36 @@
 "Allow argus-server to send notifications to MS Teams"
 
-import enum
-import json
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 import pymsteams
 
 from django.conf import settings
 from django import forms
+from rest_framework.exceptions import ValidationError
 
 from argus.notificationprofile.media.base import NotificationMedium
+
+if TYPE_CHECKING:
+    import sys
+
+    if sys.version_info[:2] < (3, 9):
+        from typing import Iterable
+    else:
+        from collections.abc import Iterable
+
+    from typing import List
+    from django.db.models.query import QuerySet
+    from argus.incident.models import Event
+    from argus.notificationprofile.models import DestinationConfig
+    from argus.notificationprofile.serializers import RequestDestinationConfigSerializer
 
 
 LOG = logging.getLogger(__name__)
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 __all__ = [
     "MSTeamsNotification",
 ]
@@ -27,6 +43,7 @@ SEVERITY_COLOR_MAPPING = {
     4: "#fdc500",  # Yellow
     5: "#4CAF50",  # Green
 }
+
 
 def modelinstance_to_dict(obj):
     dict_ = vars(obj).copy()
@@ -94,42 +111,59 @@ class MSTeamsNotification(NotificationMedium):
             "format": "iri",
         }},
     }
+    MEDIA_SETTINGS_KEY = "webhook"
 
     class Form(forms.Form):
         webhook = forms.URLField(required=True)
 
     @classmethod
-    def validate(cls, instance, dict_, _):
+    def has_duplicate(cls, queryset: QuerySet, settings: dict) -> bool:
+        return queryset.filter(
+            settings__webhook=settings[cls.MEDIA_SETTINGS_KEY]
+        ).exists()
+
+    # No querysets beyond this point!
+
+    @classmethod
+    def get_label(self, destination):
+        return f"MS TEAMS #{destination.pk}"
+
+    @classmethod
+    def validate(cls, instance: RequestDestinationConfigSerializer, dict_: dict, _) -> dict:
         form = cls.Form(dict_["settings"])
         if not form.is_valid():
             raise ValidationError(form.errors)
         return form.cleaned_data
 
     @classmethod
-    def has_duplicate(self, queryset, settings: dict) -> bool:
-        return queryset.filter(settings__webhook=settings["webhook"]).exists()
+    def get_relevant_addresses(cls, destinations: Iterable[DestinationConfig]) -> List[DestinationConfig]:
+        """Returns a list of teams channels the message should be sent to"""
+        filtered_destinations = [
+            destination.settings[cls.MEDIA_SETTINGS_KEY]
+            for destination in destinations
+            if destination.media_id == cls.MEDIA_SLUG
+        ]
+        return filtered_destinations
 
     @classmethod
-    def get_label(self, destination):
-        return f"MS TEAMS #{destination.pk}"
-
-    @staticmethod
-    def send(event, destinations, **_):
-        teams_destinations = destinations.filter(media__slug=MSTeamsNotification.MEDIA_SLUG)
+    def send(cls, event: Event, destinations: Iterable[DestinationConfig], **_) -> bool:
+        teams_destinations = cls.get_relevant_addresses(destinations)
         if not teams_destinations:
             return False
 
-        subject, context = _build_context(event)
+        context = _build_context(event)
 
         for destination in teams_destinations:
-            label = destination.label or MSTeamsNotification.get_label(destination)
-            webhook = destination.settings["webhook"]
-            card = _build_card(teams_webhook, subject, context)
+            label = destination.label or cls.get_label(destination)
+            webhook = destination.settings[cls.MEDIA_SETTINGS_KEY]
+            card = _build_card(webhook, context)
 
             try:
                 result = card.send()
             except pymsteams.TeamsWebhookException as e:
-                LOG.exception("Could not send to MS Teams {label}: {e}")
+                LOG.exception("Could not send to MS Teams %s: %s", label, e)
             else:
                 if result is not True:
-                    LOG.exception("Could not send to MS Teams {label}: Unknown reason")
+                    LOG.exception("Could not send to MS Teams %s: Unknown reason", label)
+
+        return True

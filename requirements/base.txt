@@ -1,2 +1,0 @@
-argus-server>=1.3.6
-pymsteams>=0.2
