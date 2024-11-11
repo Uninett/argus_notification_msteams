@@ -9,7 +9,6 @@ import pymsteams
 
 from django.conf import settings
 from django import forms
-from rest_framework.exceptions import ValidationError
 
 from argus.notificationprofile.media.base import NotificationMedium
 
@@ -121,7 +120,7 @@ class MSTeamsNotification(NotificationMedium):
     # No querysets beyond this point!
 
     @classmethod
-    def get_label(self, destination):
+    def get_label(cls, destination):
         "A webhook url is not human readable so use a better fallback label"
         return f"MS TEAMS #{destination.pk}"
 
