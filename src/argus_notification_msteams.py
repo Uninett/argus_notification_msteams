@@ -100,50 +100,30 @@ class MSTeamsNotification(NotificationMedium):
 
     MEDIA_SLUG = "msteams"
     MEDIA_NAME = "MS Teams"
+    MEDIA_SETTINGS_KEY = "webhook"
     MEDIA_JSON_SCHEMA = {
         "title": "MS Teams Settings",
         "description": "Settings for a DestinationConfig using MS Teams.",
         "type": "object",
-        "required": ["webhook"],
-        "properties": {"webhook": {
-            "type": "string",
-            "title": "Webhook (URL)",
-            "format": "iri",
-        }},
+        "required": [MEDIA_SETTINGS_KEY],
+        "properties": {
+            MEDIA_SETTINGS_KEY: {
+                "type": "string",
+                "title": "Webhook (URL)",
+                "format": "iri",
+            },
+        },
     }
-    MEDIA_SETTINGS_KEY = "webhook"
 
     class Form(forms.Form):
         webhook = forms.URLField(required=True)
-
-    @classmethod
-    def has_duplicate(cls, queryset: QuerySet, settings: dict) -> bool:
-        return queryset.filter(
-            settings__webhook=settings[cls.MEDIA_SETTINGS_KEY]
-        ).exists()
 
     # No querysets beyond this point!
 
     @classmethod
     def get_label(self, destination):
+        "A webhook url is not human readable so use a better fallback label"
         return f"MS TEAMS #{destination.pk}"
-
-    @classmethod
-    def validate(cls, instance: RequestDestinationConfigSerializer, dict_: dict, _) -> dict:
-        form = cls.Form(dict_["settings"])
-        if not form.is_valid():
-            raise ValidationError(form.errors)
-        return form.cleaned_data
-
-    @classmethod
-    def get_relevant_addresses(cls, destinations: Iterable[DestinationConfig]) -> List[DestinationConfig]:
-        """Returns a list of teams channels the message should be sent to"""
-        filtered_destinations = [
-            destination.settings[cls.MEDIA_SETTINGS_KEY]
-            for destination in destinations
-            if destination.media_id == cls.MEDIA_SLUG
-        ]
-        return filtered_destinations
 
     @classmethod
     def send(cls, event: Event, destinations: Iterable[DestinationConfig], **_) -> bool:
