@@ -5,8 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import pymsteams
-
+from apprise import Apprise, NotifyType
 from django.conf import settings
 from django import forms
 from rest_framework.exceptions import ValidationError
@@ -30,20 +29,22 @@ if TYPE_CHECKING:
 
 LOG = logging.getLogger(__name__)
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 __all__ = [
     "MSTeamsNotification",
 ]
 
 
-SEVERITY_COLOR_MAPPING = {
-    1: "#910041",  # Purpleish
-    2: "#dc0000",  # Red
-    3: "#fd8c00",  # Orange
-    4: "#fdc500",  # Yellow
-    5: "#4CAF50",  # Green
-}
+# Slightly hacky way of having different colors for different levels
+# Tries to match colors used in Argus
 
+NOTIFY_TYPE_MAPPING = {
+    1: NotifyType.FAILURE,  # Red
+    2: NotifyType.WARNING,  # Orange
+    3: NotifyType.WARNING,  # Orange
+    4: NotifyType.SUCCESS,  # Green
+    5: NotifyType.INFO,  # Blue
+}
 
 def modelinstance_to_dict(obj):
     dict_ = vars(obj).copy()
@@ -80,20 +81,18 @@ def _build_context(event):
     return context
 
 
-def _build_card(teams_webhook, context):
-    card = pymsteams.connectorcard(teams_webhook)
-    card.title(context["subject"])
-    card.color(SEVERITY_COLOR_MAPPING[context["level"]])
-    card.text(context['message'])
-    fact_section = pymsteams.cardsection()
-    fact_section.addFact("Status", context['status'])
-    fact_section.addFact("Actor", context['actor'])
+def _build_message(context) -> str:
+    lines = []
+    lines.append(f"**{context['subject']}**")
+    lines.append(context["message"])
+    lines.append(f"**Status** {context['status']}")
+    lines.append(f"**Actor** {context['actor']}")
     if context["expiration"]:
-        fact_section.addFact("Expires", context['expiration'])
+        lines.append(f"**Expires** {context['expiration']}")
     for field, value in context["incident_dict"].items():
-        fact_section.addFact(field, value)
-    card.addSection(fact_section)
-    return card
+        lines.append(f"**{field}** {value}")
+
+    return "\n\n".join(lines)
 
 
 class MSTeamsNotification(NotificationMedium):
@@ -152,18 +151,20 @@ class MSTeamsNotification(NotificationMedium):
             return False
 
         context = _build_context(event)
+        message = _build_message(context)
 
         for destination in teams_destinations:
             label = destination.label or cls.get_label(destination)
             webhook = destination.settings[cls.MEDIA_SETTINGS_KEY]
-            card = _build_card(webhook, context)
 
-            try:
-                result = card.send()
-            except pymsteams.TeamsWebhookException as e:
-                LOG.exception("Could not send to MS Teams %s: %s", label, e)
-            else:
-                if result is not True:
-                    LOG.exception("Could not send to MS Teams %s: Unknown reason", label)
+            notifier = Apprise()
+            notifier.add(webhook)
+
+            LOG.info("Sending message to MS Teams destination '%s'", label)
+            result = notifier.notify(body=message, notify_type=NOTIFY_TYPE_MAPPING[context["level"]])
+
+            LOG.info("notifier.notify() returned %r", result)
+            if result is not True:
+                LOG.error("Could not send to MS Teams %s: Unknown reason", label)
 
         return True

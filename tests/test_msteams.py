@@ -1,8 +1,8 @@
-from django.conf import settings
-from django.test import TestCase, SimpleTestCase
+#from django.conf import settings
+#from django.test import TestCase, SimpleTestCase
 
-from argus.incident.factories import IncidentFactory
-from argus_notification_msteams import _build_card, _build_context, MSTeamsNotification
+#from argus.incident.factories import IncidentFactory
+#from argus_notification_msteams import _build_context, MSTeamsNotification
 
 
 # class TestHelperFunctions(TestCase):
@@ -38,28 +38,3 @@ from argus_notification_msteams import _build_card, _build_context, MSTeamsNotif
 #     def test__build_context_level_is_incident_level(self):
 #         context = _build_context(self.event)
 #         self.assertEqual(context["level"], self.event.incident.level)
-
-
-class TestCardBuilder(SimpleTestCase):
-
-    def test___build_card(self):
-        context = {
-            "subject": "test",
-            "title": "title",
-            "status": "STA",
-            "expiration": "2022-11-178T11:46+01:00",
-            "level": 3,
-            "actor": "tester@eaxmple.com",
-            "message": "this is a test notification!",
-            "incident_dict": {
-                "key1": "value1",
-            },
-        }
-        webhook = "https://example.org/"
-        card = _build_card(webhook, context)
-        self.assertEqual(card.hookurl, webhook)
-        self.assertEqual(card.payload["title"], context["subject"])
-        # One section
-        self.assertEqual(len(card.payload["sections"]), 1)
-        # Only containing facts
-        self.assertIn("facts", card.payload["sections"][0].keys())

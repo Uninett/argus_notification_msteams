@@ -15,6 +15,7 @@ INSTALLED_APPS = [
     'argus.auth',
     'argus.incident',
     'argus.notificationprofile',
+    'argus.plannedmaintenance'
 ]
 
 DATABASES = {
