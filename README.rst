@@ -1,12 +1,10 @@
 argus_notification_msteams
 ==========================
 
-ALPHA-VERSION!
-
 This is a plugin to send notifications to MSTeams from
 `Argus <https://github.com/Uninett/argus-server>`_
 
-Different levels of incidents have hard-coded icon colors, based on those used in the Argus frontend.
+cdDifferent levels of incidents have hard-coded icon colors, based on those used in the Argus frontend.
 
 Version 0.5.1 and older can be used by argus-server version 1.9.x to 1.13.x.
 
