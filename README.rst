@@ -6,7 +6,7 @@ ALPHA-VERSION!
 This is a plugin to send notifications to MSTeams from
 `Argus <https://github.com/Uninett/argus-server>`_
 
-Different levels of incidents have hard-coded colors.
+Different levels of incidents have hard-coded icon colors, based on those used in the Argus frontend.
 
 Version 0.5.1 and older can be used by argus-server version 1.9.x to 1.13.x.
 
@@ -25,7 +25,8 @@ The plugin uses the setting ``NOTIFICATION_SUBJECT_PREFIX``.
 Configuration
 -------------
 
-Create a webhook inside MS Teams, which results in a long url that needs to be
+Create a workflow inside MS team to send webhook alerts to a chat or channel.
+This lets you use "Copy webhook link" to get a long url that needs to be
 stored in the ``settings``-field.
 
 You can test without invoking the frontend by adding the webhook manually in
