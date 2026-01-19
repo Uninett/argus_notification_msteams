@@ -4,7 +4,7 @@
 
 For version 1, we replaced the dependency ``pymsteams`` with ``appraise``.
 
-When upgrading, ``pymsteams`` might need to be removed using ``pip-recipe`` or something similar.
+After upgrading, the ``pymsteams`` library may be cleaned away using ``pip uninstall pymsteams`` or something similar.
 
 This also means that a new MS Teams workflow needs to be created in place of any existing webhooks.
 See the **README** for instructions.
