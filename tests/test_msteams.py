@@ -1,8 +1,8 @@
-from django.conf import settings
-from django.test import TestCase, SimpleTestCase
+#from django.conf import settings
+from django.test import SimpleTestCase
 
-from argus.incident.factories import IncidentFactory
-from argus_notification_msteams import _build_card, _build_context, MSTeamsNotification
+#from argus.incident.factories import IncidentFactory
+from argus_notification_msteams import _build_message
 
 
 # class TestHelperFunctions(TestCase):
@@ -40,9 +40,9 @@ from argus_notification_msteams import _build_card, _build_context, MSTeamsNotif
 #         self.assertEqual(context["level"], self.event.incident.level)
 
 
-class TestCardBuilder(SimpleTestCase):
+class TestMessageBuilder(SimpleTestCase):
 
-    def test___build_card(self):
+    def test_build_message(self):
         context = {
             "subject": "test",
             "title": "title",
@@ -53,13 +53,15 @@ class TestCardBuilder(SimpleTestCase):
             "message": "this is a test notification!",
             "incident_dict": {
                 "key1": "value1",
+                "key2": "value2",
             },
         }
-        webhook = "https://example.org/"
-        card = _build_card(webhook, context)
-        self.assertEqual(card.hookurl, webhook)
-        self.assertEqual(card.payload["title"], context["subject"])
-        # One section
-        self.assertEqual(len(card.payload["sections"]), 1)
-        # Only containing facts
-        self.assertIn("facts", card.payload["sections"][0].keys())
+        message = _build_message(context)
+        self.assertIn("**test**", message)
+        self.assertIn("this is a test notification!", message)
+        self.assertIn("**Status** STA", message)
+        self.assertIn("**Actor** tester@eaxmple.com", message)
+        self.assertIn("**Expires** 2022-11-178T11:46+01:00", message)
+        self.assertIn("**key1** value1", message)
+        self.assertIn("**key2** value2", message)
+

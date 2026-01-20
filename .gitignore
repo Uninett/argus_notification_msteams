@@ -4,3 +4,5 @@ __pycache__
 Attic
 dist
 htmlcov
+.venv
+venv
