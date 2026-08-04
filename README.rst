@@ -38,7 +38,7 @@ POST-ing to the API:
       "media": "msteams",
       "label": "whatever",
       "settings": {
-        "webhook": "https://msteams.domain/some-very-long-webhook-specific-path"
+        "destination_url": "https://msteams.domain/some-very-long-webhook-specific-path"
       }
     }
 
@@ -55,6 +55,10 @@ GET-ing from the API:
     "label": "whatever",
     "suggested_label": "whatever",
     "settings": {
-      "webhook": "https://msteams.domain/some-very-long-webhook-specific-path"
+      "destination_url": "https://msteams.domain/some-very-long-webhook-specific-path"
     }
   }
+
+Destinations created before version 1.1.0 store their URL under the
+``webhook`` key instead of ``destination_url``. This is still accepted when
+creating or updating a destination, but using the new field is recommended, see **UPGRADING** for details.
