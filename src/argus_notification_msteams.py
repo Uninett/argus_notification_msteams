@@ -3,33 +3,21 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Iterable, TYPE_CHECKING
 
-from apprise import Apprise, NotifyType
+from apprise import NotifyType
 from django.conf import settings
-from django import forms
-from rest_framework.exceptions import ValidationError
 
-from argus.notificationprofile.media.base import NotificationMedium
+from argus.notificationprofile.models import DestinationConfig
+from argus.notificationprofile.media.base import AppriseMedium, modelinstance_to_dict
 
 if TYPE_CHECKING:
-    import sys
-
-    if sys.version_info[:2] < (3, 9):
-        from typing import Iterable
-    else:
-        from collections.abc import Iterable
-
-    from typing import List
-    from django.db.models.query import QuerySet
     from argus.incident.models import Event
-    from argus.notificationprofile.models import DestinationConfig
-    from argus.notificationprofile.serializers import RequestDestinationConfigSerializer
 
 
 LOG = logging.getLogger(__name__)
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = [
     "MSTeamsNotification",
 ]
@@ -45,11 +33,6 @@ NOTIFY_TYPE_MAPPING = {
     4: NotifyType.SUCCESS,  # Green
     5: NotifyType.INFO,  # Blue
 }
-
-def modelinstance_to_dict(obj):
-    dict_ = vars(obj).copy()
-    dict_.pop("_state")
-    return dict_
 
 
 def _build_context(event):
@@ -75,7 +58,7 @@ def _build_context(event):
         "expiration": expiration,
         "level": incident.level,
         "actor": event.actor.username,
-        'message': incident.description,
+        "message": incident.description,
         "incident_dict": incident_dict,
     }
     return context
@@ -95,76 +78,61 @@ def _build_message(context) -> str:
     return "\n\n".join(lines)
 
 
-class MSTeamsNotification(NotificationMedium):
+LEGACY_SETTINGS_KEY = "webhook"
 
+
+def _get_destination_url(destination: DestinationConfig) -> str:
+    settings = destination.settings
+    return settings.get("destination_url") or settings.get(LEGACY_SETTINGS_KEY)
+
+
+class MSTeamsNotification(AppriseMedium):
     MEDIA_SLUG = "msteams"
     MEDIA_NAME = "MS Teams"
     MEDIA_JSON_SCHEMA = {
         "title": "MS Teams Settings",
         "description": "Settings for a DestinationConfig using MS Teams.",
         "type": "object",
-        "required": ["webhook"],
-        "properties": {"webhook": {
-            "type": "string",
-            "title": "Webhook (URL)",
-            "format": "iri",
-        }},
+        "required": ["destination_url"],
+        "properties": {
+            "destination_url": {
+                "type": "string",
+                "title": "Webhook (URL)",
+                "format": "iri",
+            }
+        },
     }
-    MEDIA_SETTINGS_KEY = "webhook"
-
-    class Form(forms.Form):
-        webhook = forms.URLField(required=True)
 
     @classmethod
-    def has_duplicate(cls, queryset: QuerySet, settings: dict) -> bool:
-        return queryset.filter(
-            settings__webhook=settings[cls.MEDIA_SETTINGS_KEY]
-        ).exists()
+    def validate(cls, instance, msteams_dict: dict, user) -> dict:
+        settings = msteams_dict.get("settings") or {}
+        if LEGACY_SETTINGS_KEY in settings and "destination_url" not in settings:
+            settings = {**settings, "destination_url": settings[LEGACY_SETTINGS_KEY]}
+            msteams_dict = {**msteams_dict, "settings": settings}
+        return super().validate(instance, msteams_dict, user)
 
-    # No querysets beyond this point!
-
-    @classmethod
-    def get_label(self, destination):
-        return f"MS TEAMS #{destination.pk}"
-
-    @classmethod
-    def validate(cls, instance: RequestDestinationConfigSerializer, dict_: dict, _) -> dict:
-        form = cls.Form(dict_["settings"])
-        if not form.is_valid():
-            raise ValidationError(form.errors)
-        return form.cleaned_data
+    @staticmethod
+    def get_label(destination) -> str:
+        return _get_destination_url(destination)
 
     @classmethod
-    def get_relevant_addresses(cls, destinations: Iterable[DestinationConfig]) -> List[DestinationConfig]:
-        """Returns a list of teams channels the message should be sent to"""
-        filtered_destinations = [
-            destination.settings[cls.MEDIA_SETTINGS_KEY]
-            for destination in destinations
-            if destination.media_id == cls.MEDIA_SLUG
-        ]
-        return filtered_destinations
+    def get_relevant_address(cls, destination):
+        return _get_destination_url(destination)
 
     @classmethod
-    def send(cls, event: Event, destinations: Iterable[DestinationConfig], **_) -> bool:
-        teams_destinations = cls.get_relevant_addresses(destinations)
-        if not teams_destinations:
-            return False
+    def send(
+        cls, event: Event, destinations: Iterable[DestinationConfig], **kwargs
+    ) -> bool:
+        return super().send(
+            event,
+            destinations,
+            notify_type=NOTIFY_TYPE_MAPPING[event.incident.level],
+            **kwargs,
+        )
 
+    @staticmethod
+    def create_message_context(event: Event):
         context = _build_context(event)
+        subject = context["subject"]
         message = _build_message(context)
-
-        for destination in teams_destinations:
-            label = destination.label or cls.get_label(destination)
-            webhook = destination.settings[cls.MEDIA_SETTINGS_KEY]
-
-            notifier = Apprise()
-            notifier.add(webhook)
-
-            LOG.info("Sending message to MS Teams destination '%s'", label)
-            result = notifier.notify(body=message, notify_type=NOTIFY_TYPE_MAPPING[context["level"]])
-
-            LOG.info("notifier.notify() returned %r", result)
-            if result is not True:
-                LOG.error("Could not send to MS Teams %s: Unknown reason", label)
-
-        return True
+        return subject, message
