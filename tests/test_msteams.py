@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
+from rest_framework.exceptions import ValidationError
 
 from argus_notification_msteams import (
     NOTIFY_TYPE_MAPPING,
@@ -79,15 +80,83 @@ class MSTeamsNotificationValidateTests(SimpleTestCase):
         self.user.destinations.filter.return_value.exists.return_value = False
 
     def test_given_legacy_webhook_key_should_rewrite_it_to_destination_url(self):
-        dict_ = {"settings": {"webhook": "https://webhook.example.com"}}
-        cleaned_data = MSTeamsNotification.validate(self.instance, dict_, self.user)
-        self.assertEqual(
-            cleaned_data, {"destination_url": "https://webhook.example.com"}
+        url = (
+            "https://example.logic.azure.com/workflows/abc/triggers/manual/paths/invoke"
         )
+        dict_ = {"settings": {"webhook": url}}
+        cleaned_data = MSTeamsNotification.validate(self.instance, dict_, self.user)
+        self.assertEqual(cleaned_data, {"destination_url": url})
 
     def test_given_destination_url_key_validate_should_leave_it_untouched(self):
-        dict_ = {"settings": {"destination_url": "https://webhook.example.com"}}
+        url = (
+            "https://example.logic.azure.com/workflows/abc/triggers/manual/paths/invoke"
+        )
+        dict_ = {"settings": {"destination_url": url}}
+        cleaned_data = MSTeamsNotification.validate(self.instance, dict_, self.user)
+        self.assertEqual(cleaned_data, {"destination_url": url})
+
+    def test_given_power_platform_workflow_url_validate_should_accept_it(self):
+        # Power Automate hosts vary, so we check other parts of the URL
+        url = (
+            "https://default-example.0d.environment.api.powerplatform.com:443"
+            "/powerautomate/automations/direct/cu/23/workflows/2a5acbf4/"
+            "triggers/manual/paths/invoke?api-version=1&sig=abc"
+        )
+        dict_ = {"settings": {"destination_url": url}}
+        cleaned_data = MSTeamsNotification.validate(self.instance, dict_, self.user)
+        self.assertEqual(cleaned_data, {"destination_url": url})
+
+    def test_given_apprise_workflow_scheme_url_validate_should_accept_it(self):
+        dict_ = {"settings": {"destination_url": "workflows://example.com/abc/def/"}}
         cleaned_data = MSTeamsNotification.validate(self.instance, dict_, self.user)
         self.assertEqual(
-            cleaned_data, {"destination_url": "https://webhook.example.com"}
+            cleaned_data, {"destination_url": "workflows://example.com/abc/def/"}
         )
+
+    def test_given_apprise_singular_workflow_scheme_url_validate_should_accept_it(
+        self,
+    ):
+        dict_ = {"settings": {"destination_url": "workflow://example.com/abc/def/"}}
+        cleaned_data = MSTeamsNotification.validate(self.instance, dict_, self.user)
+        self.assertEqual(
+            cleaned_data, {"destination_url": "workflow://example.com/abc/def/"}
+        )
+
+    def test_given_current_incoming_webhook_url_validate_should_accept_it(self):
+        dict_ = {
+            "settings": {
+                "destination_url": (
+                    "https://myteam.webhook.office.com/webhookb2/"
+                    "abcd@efgh/IncomingWebhook/1234/5678"
+                )
+            }
+        }
+        cleaned_data = MSTeamsNotification.validate(self.instance, dict_, self.user)
+        self.assertEqual(cleaned_data, dict_["settings"])
+
+    def test_given_legacy_incoming_webhook_url_validate_should_accept_it(self):
+        dict_ = {
+            "settings": {
+                "destination_url": (
+                    "https://outlook.office.com/webhook/abcd@efgh/"
+                    "IncomingWebhook/1234/5678"
+                )
+            }
+        }
+        cleaned_data = MSTeamsNotification.validate(self.instance, dict_, self.user)
+        self.assertEqual(cleaned_data, dict_["settings"])
+
+    def test_given_apprise_msteams_scheme_url_validate_should_raise_validation_error(
+        self,
+    ):
+        # Apprise does not support this URL form anymores
+        dict_ = {"settings": {"destination_url": "msteams://team/tokenA/tokenB/tokenC"}}
+        with self.assertRaises(ValidationError):
+            MSTeamsNotification.validate(self.instance, dict_, self.user)
+
+    def test_given_url_not_pointing_to_msteams_validate_should_raise_validation_error(
+        self,
+    ):
+        dict_ = {"settings": {"destination_url": "https://webhook.example.com"}}
+        with self.assertRaises(ValidationError):
+            MSTeamsNotification.validate(self.instance, dict_, self.user)
