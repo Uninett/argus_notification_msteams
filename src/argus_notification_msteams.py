@@ -6,10 +6,11 @@ import logging
 from typing import Iterable, TYPE_CHECKING
 
 from apprise import NotifyType
+from django import forms
 from django.conf import settings
 
-from argus.notificationprofile.models import DestinationConfig
 from argus.notificationprofile.media.base import AppriseMedium, modelinstance_to_dict
+from argus.notificationprofile.models import DestinationConfig
 
 if TYPE_CHECKING:
     from argus.incident.models import Event
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 
 LOG = logging.getLogger(__name__)
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __all__ = [
     "MSTeamsNotification",
 ]
@@ -80,6 +81,17 @@ def _build_message(context) -> str:
 
 LEGACY_SETTINGS_KEY = "webhook"
 
+# For validation purposes, these markers cover:
+#   - Incoming Webhooks (deprecated)
+#   - Power Automate
+#   - Apprise's own URL structure
+MSTEAMS_URL_MARKERS = (
+    "office.com",
+    "/triggers/manual/paths/invoke",
+    "workflow://",
+    "workflows://",
+)
+
 
 def _get_destination_url(destination: DestinationConfig) -> str:
     settings = destination.settings
@@ -102,6 +114,19 @@ class MSTeamsNotification(AppriseMedium):
             }
         },
     }
+
+    class Form(forms.Form):
+        destination_url = forms.CharField()
+
+        def clean_destination_url(self):
+            destination_url = self.cleaned_data["destination_url"]
+            if not any(marker in destination_url for marker in MSTEAMS_URL_MARKERS):
+                raise forms.ValidationError(
+                    "Not a valid MS Teams destination URL. Use an MS Teams "
+                    "incoming webhook, a Power Automate workflow"
+                    "or an Apprise workflow URL (workflow://... or workflows://...)."
+                )
+            return destination_url
 
     @classmethod
     def validate(cls, instance, msteams_dict: dict, user) -> dict:
